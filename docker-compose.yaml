@@ -1,0 +1,53 @@
+version: "3.7"
+
+services:
+  primary:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: mydatabase
+      POSTGRES_USER: masteruser
+      POSTGRES_PASSWORD: masterpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - primary_data:/var/lib/postgresql/data
+      - ./postgres-init/init-primary.sh:/docker-entrypoint-initdb.d/init-primary.sh
+
+  read_replica:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: mydatabase
+      POSTGRES_USER: replicauser
+      POSTGRES_PASSWORD: replicapassword
+    command:
+      [
+        "postgres",
+        "-c",
+        "wal_level=replica",
+        "-c",
+        "max_wal_senders=2",
+        "-c",
+        "hot_standby=on",
+      ]
+    depends_on:
+      - primary
+    ports:
+      - "5433:5432"
+    volumes:
+      - read_replica_data:/var/lib/postgresql/data
+      - ./postgres-init/init-replica.sh:/docker-entrypoint-initdb.d/init-replica.sh
+
+  pgbouncer:
+    image: edoburu/pgbouncer
+    ports:
+      - "6432:5432"
+    environment:
+      DB_USER: masteruser
+      DB_PASSWORD: masterpassword
+      DB_HOST: primary
+      DB_NAME: mydatabase
+      POOL_MODE: session
+
+volumes:
+  primary_data:
+  read_replica_data:
